@@ -1,0 +1,89 @@
+from __future__ import annotations
+
+from pathlib import Path
+import sys
+
+from flair.embeddings import TransformerDocumentEmbeddings
+from keybert import KeyBERT
+from tqdm import tqdm
+
+
+CURRENT_DIR = Path(__file__).resolve().parent
+SRC_DIR = CURRENT_DIR.parent
+PROJECT_ROOT = SRC_DIR.parent
+
+for directory in (PROJECT_ROOT, SRC_DIR):
+    if str(directory) not in sys.path:
+        sys.path.insert(0, str(directory))
+
+from Utils.IO import JSON_File_IO
+from scripts.CrossEncoderConfig import CROSS_ENCODER_PREFIX
+
+
+DEFAULT_INPUT_FILE = PROJECT_ROOT / "Output" / "Caching" / f"{CROSS_ENCODER_PREFIX}_Cached_ES_Results.json"
+DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "Output" / "Generation"
+DEFAULT_OUTPUT_FILE_NAME = f"{CROSS_ENCODER_PREFIX}_Cached_BR_Keywords.json"
+DEFAULT_MODEL_NAME = "Salesforce/codet5-small"
+
+DEFAULT_N_GRAM_LEFT = 1
+DEFAULT_N_GRAM_RIGHT = 1
+DEFAULT_STOP_WORDS = "english"
+DEFAULT_DIVERSITY = 0.5
+DEFAULT_TOP_N = 15
+
+
+def _build_bug_report_text(bug_report: dict) -> str:
+    bug_title = str(bug_report.get("bug_title", "")).strip()
+    bug_description = str(bug_report.get("bug_description", "")).strip()
+    return (bug_title + " . " + bug_description).strip(" .")
+
+
+def generate_keywords_for_reports(bug_reports: list[dict], kw_model: KeyBERT) -> list[dict]:
+    generated_reports = []
+
+    for bug_report in tqdm(bug_reports, total=len(bug_reports), desc="Generating BR keywords"):
+        bug_text = _build_bug_report_text(bug_report)
+
+        keywords = kw_model.extract_keywords(
+            bug_text,
+            keyphrase_ngram_range=(DEFAULT_N_GRAM_LEFT, DEFAULT_N_GRAM_RIGHT),
+            stop_words=DEFAULT_STOP_WORDS,
+            use_mmr=True,
+            diversity=DEFAULT_DIVERSITY,
+            top_n=DEFAULT_TOP_N,
+        )
+        keywords_joined = " ".join(keyword for keyword, _ in keywords)
+
+        output_bug_report = dict(bug_report)
+        output_bug_report["keywords"] = keywords_joined
+        output_bug_report["n_gram_left"] = DEFAULT_N_GRAM_LEFT
+        output_bug_report["n_gram_right"] = DEFAULT_N_GRAM_RIGHT
+        output_bug_report["stop_words"] = DEFAULT_STOP_WORDS
+        output_bug_report["nr_candidates"] = DEFAULT_DIVERSITY
+        output_bug_report["top_n"] = DEFAULT_TOP_N
+        generated_reports.append(output_bug_report)
+
+    return generated_reports
+
+
+if __name__ == "__main__":
+    input_file_path = str(DEFAULT_INPUT_FILE)
+    output_dir = str(DEFAULT_OUTPUT_DIR)
+    output_file_name = DEFAULT_OUTPUT_FILE_NAME
+
+    model = TransformerDocumentEmbeddings(DEFAULT_MODEL_NAME)
+    keyword_model = KeyBERT(model=model)
+
+    cached_bug_reports = JSON_File_IO.load_JSON_to_Dict(input_file_path)
+    if not isinstance(cached_bug_reports, list):
+        raise ValueError("Input JSON must be a list of bug report objects.")
+
+    generated_bug_reports = generate_keywords_for_reports(cached_bug_reports, keyword_model)
+
+    JSON_File_IO.save_Dict_to_JSON(
+        generated_bug_reports,
+        file_path=output_dir,
+        file_name=output_file_name,
+    )
+    print(f"Saved BR keywords to {Path(output_dir) / output_file_name}")
+
