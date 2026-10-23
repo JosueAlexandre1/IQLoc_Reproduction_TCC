@@ -11,15 +11,17 @@ CURRENT_DIR = Path(__file__).resolve().parent
 SRC_DIR = CURRENT_DIR.parent.parent
 PROJECT_ROOT = SRC_DIR.parent
 
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
+for directory in (PROJECT_ROOT, SRC_DIR):
+    if str(directory) not in sys.path:
+        sys.path.insert(0, str(directory))
 
 from Utils.IO import JSON_File_IO
+from scripts.CrossEncoderConfig import CROSS_ENCODER_PREFIX
 
 
-DEFAULT_INPUT_FILE = PROJECT_ROOT / "Output" / "Caching" / "Cached_CE_Scores.json"
+DEFAULT_INPUT_FILE = PROJECT_ROOT / "Output" / "Caching" / f"{CROSS_ENCODER_PREFIX}_Cached_CE_Scores.json"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "Output" / "Generation" / "Modified"/ "Source Code"
-DEFAULT_OUTPUT_FILE_NAME = "Yake_Cached_Source_Keywords.json"
+DEFAULT_OUTPUT_FILE_NAME = f"{CROSS_ENCODER_PREFIX}_Yake_Cached_Source_Keywords.json"
 
 DEFAULT_CE_SCORE_THRESHOLD = 0.5
 DEFAULT_SOURCE_KEYWORD_LENGTH = 15
