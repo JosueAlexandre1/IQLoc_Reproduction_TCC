@@ -1,3 +1,8 @@
+# Alterar caminho
+
+Alterar variável no script load.py: DATASET_ROOT_PATH
+
+
 # Implementação e experimentos do TCC
 
 Este documento complementa o [README.md](./README.md), que descreve a reprodução do IQLoc. O foco aqui é separar o fluxo de referência do projeto das extensões experimentais e dos utilitários presentes nesta cópia do repositório.
