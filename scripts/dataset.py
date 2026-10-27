@@ -1,3 +1,4 @@
+
 import os
 import json
 import xml.etree.ElementTree as ET
@@ -31,26 +32,12 @@ def build_iqloc_dataset(data_root, output_file):
 
             print("\nProcessando Project: {}".format(project))
 
-            # ---------------------------------------------------------
-            # Mapeia as versões reais existentes em sources/
-            #
-            # Exemplo:
-            # sources/
-            #   CAMEL_1_1_0/
-            #   CAMEL_1_2_0/
-            #   CAMEL_1_3_0/
-            #
-            # Essas são exatamente as strings usadas pelo indexador.
-            # ---------------------------------------------------------
-
+            # Mapeia as versões existentes em sources/
             source_versions = {}
 
             if os.path.isdir(sources_path):
                 for version_dir in os.listdir(sources_path):
-                    version_path = os.path.join(
-                        sources_path,
-                        version_dir
-                    )
+                    version_path = os.path.join(sources_path, version_dir)
 
                     if os.path.isdir(version_path):
                         source_versions[version_dir] = version_dir
@@ -71,11 +58,14 @@ def build_iqloc_dataset(data_root, output_file):
                     print("  {}".format(e))
                     continue
 
+                # Extrai a versão do nome do arquivo, sem a extensão.
+                # Exemplo: WFCORE_3_0_0.xml -> WFCORE_3_0_0
+                filename_version = os.path.splitext(xml_file)[0]
+
                 # Cada <bug> do XML
                 for bug in root.findall("bug"):
 
                     bug_id = bug.get("id", "")
-
                     bug_info = bug.find("buginformation")
 
                     if bug_info is None:
@@ -103,38 +93,16 @@ def build_iqloc_dataset(data_root, output_file):
                         else ""
                     )
 
-                    # -------------------------------------------------
-                    # Descobre a versão REAL usada pelo índice.
-                    #
-                    # O indexador usa:
-                    #
-                    #     version_name
-                    #
-                    # que corresponde diretamente ao nome da pasta
-                    # dentro de sources/.
-                    #
-                    # Portanto o JSON precisa usar exatamente o mesmo
-                    # nome da pasta.
-                    # -------------------------------------------------
-
+                    # Mantém a lógica original de identificação da versão.
                     version = ""
 
                     if xml_version:
-                        # 1. Caso o XML já tenha exatamente o nome
-                        #    da pasta.
+                        # 1. Correspondência exata
                         if xml_version in source_versions:
                             version = source_versions[xml_version]
 
                         else:
-                            # 2. Caso o XML tenha apenas a versão,
-                            #    por exemplo:
-                            #
-                            #    1.1.0
-                            #
-                            #    e a pasta seja:
-                            #
-                            #    CAMEL_1_1_0
-                            #
+                            # 2. Normaliza a versão do XML
                             normalized_xml_version = (
                                 xml_version
                                 .replace(".", "_")
@@ -150,12 +118,8 @@ def build_iqloc_dataset(data_root, output_file):
                                 version = source_versions[expected_version]
 
                             else:
-                                # 3. Procura uma pasta cujo nome
-                                #    termine com a versão normalizada.
-                                #
-                                #    Isso evita depender de uma
-                                #    convenção específica além do
-                                #    nome real da pasta.
+                                # 3. Procura uma pasta terminada
+                                #    pela versão normalizada
                                 for source_version in source_versions:
                                     if source_version.endswith(
                                         "_" + normalized_xml_version
@@ -163,43 +127,39 @@ def build_iqloc_dataset(data_root, output_file):
                                         version = source_version
                                         break
 
-                    # -------------------------------------------------
-                    # Se ainda não encontrou a versão, não inventa uma
-                    # versão que pode não existir no índice.
-                    #
-                    # Isso é importante para evitar novamente uma
-                    # inconsistência entre Dataset e Elasticsearch.
-                    # -------------------------------------------------
+                    # 4. NOVA TENTATIVA:
+                    # Se tudo falhar, usa o nome do arquivo XML,
+                    # mas somente se existir em sources/.
+                    if not version and filename_version in source_versions:
+                        version = source_versions[filename_version]
 
+                        print(
+                            "  INFO: versão obtida pelo nome do arquivo: "
+                            "{} | bug: {}".format(filename_version, bug_id)
+                        )
+
+                    # Se todas as tentativas falharem, mantém vazio.
                     if not version:
                         print(
                             "  AVISO: versão não encontrada em sources: "
-                            "{} | projeto: {} | bug: {}".format(
+                            "{} | arquivo: {} | projeto: {} | bug: {}".format(
                                 xml_version,
+                                xml_file,
                                 project,
                                 bug_id
                             )
                         )
 
-                    # -------------------------------------------------
                     # Arquivos modificados/corrigidos
-                    # -------------------------------------------------
-
                     fixed_files = []
-
                     fixed_files_node = bug.find("fixedFiles")
 
                     if fixed_files_node is not None:
                         for file_node in fixed_files_node.findall("file"):
                             if file_node.text:
-                                fixed_files.append(
-                                    file_node.text.strip()
-                                )
+                                fixed_files.append(file_node.text.strip())
 
-                    # -------------------------------------------------
-                    # Adiciona TODOS os bugs encontrados no XML
-                    # -------------------------------------------------
-
+                    # Adiciona todos os bugs encontrados
                     dataset.append({
                         "bug_id": bug_id,
                         "project": project,
@@ -233,6 +193,6 @@ def build_iqloc_dataset(data_root, output_file):
 
 
 build_iqloc_dataset(
-    "/home/josue/Área de trabalho/Bench4BL/data",
-    "/home/josue/Área de trabalho/iqloc/iqloc_reproduction/Dataset/Bench4BLExtended.json"
+    "C:/Users/PET/Bench4BL/data",
+    "C:/Users/PET/IQLoc/IQLoc_Reproduction_TCC/Dataset/Bench4BLExtended.json"
 )

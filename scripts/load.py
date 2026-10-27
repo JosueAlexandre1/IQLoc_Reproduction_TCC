@@ -42,7 +42,7 @@ except ModuleNotFoundError as e:
 
 
 
-DATASET_ROOT_PATH = r"D:\Bench4BL_Selecionado\data"
+DATASET_ROOT_PATH = r"C:\\Users\\PET\\Bench4BL\\data" #Raiz da pasta data do Bench4BL na máquina
 
 
 
