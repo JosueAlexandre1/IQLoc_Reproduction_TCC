@@ -48,7 +48,16 @@ class CrossEncoderScorer:
 
         self.model = CrossEncoder(
             model_path,
+            activation_fn=torch.nn.Sigmoid(),
             **cross_encoder_kwargs,
+        )
+        print(
+            "Ativação efetiva:",
+            type(self.model.activation_fn).__name__
+        )
+        print(
+            "Número de labels:",
+            self.model.num_labels
         )
 
     def _predict_batch(self, pairs):

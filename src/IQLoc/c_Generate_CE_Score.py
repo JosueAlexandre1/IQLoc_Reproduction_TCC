@@ -15,9 +15,11 @@ for directory in (PROJECT_ROOT, SRC_DIR):
 
 from IQLoc.CE_Method_Scorer import CrossEncoderScorer
 from Utils.IO import JSON_File_IO
-from cross_encoder_selector import MODEL_NAME
-from scripts.CrossEncoderConfig import CROSS_ENCODER_PREFIX
-
+from cross_encoder_selector import (
+    MODEL_NAME,
+    MODEL_CONFIG,
+    CROSS_ENCODER_PREFIX,
+)
 DEFAULT_INPUT_FILE = PROJECT_ROOT / "Output" / "Generation" / f"{CROSS_ENCODER_PREFIX}_Cached_BR_Keywords.json"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "Output" / "Caching"
 DEFAULT_OUTPUT_FILE_NAME = f"{CROSS_ENCODER_PREFIX}_Cached_CE_Scores.json"
@@ -29,7 +31,31 @@ def load_dataframe(file_path):
 
 
 def calculate_IR_metrices(df, embedding_model=DEFAULT_CE_MODEL):
-    ce_reranker = CrossEncoderScorer(model_path=embedding_model)
+    ce_reranker = CrossEncoderScorer(
+        model_path=embedding_model,
+        batch_size=MODEL_CONFIG["batch_size"],
+        max_length=MODEL_CONFIG["max_length"],
+        fp16=MODEL_CONFIG["fp16"],
+        empty_cuda_cache_after_result=MODEL_CONFIG[
+            "empty_cuda_cache_after_result"
+        ],
+    )
+
+    print("Modelo efetivo:", embedding_model)
+    print("Prefixo:", CROSS_ENCODER_PREFIX)
+    print(
+        "Ativação:",
+        type(ce_reranker.model.activation_fn).__name__
+    )
+    print(
+        "Comprimento máximo efetivo:",
+        getattr(
+            ce_reranker.model,
+            "max_seq_length",
+            getattr(ce_reranker.model, "max_length", None)
+        )
+    )
+    print("Número de labels:", ce_reranker.model.num_labels)
 
     for index, row in tqdm(df.iterrows(), total=len(df), desc="Scoring rows"):
         bug_title = row['bug_title']

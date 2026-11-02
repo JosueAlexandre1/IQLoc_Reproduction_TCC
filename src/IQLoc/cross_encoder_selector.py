@@ -32,7 +32,7 @@ MODELS = {
     },
     "6": {
         "name": "MS MARCO MiniLM L6 (baseline)",
-        "id": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+        "id": "cross-encoder/ms-marco-MiniLM-L6-v2",
         "compatible": True,
     },
     "7": {

@@ -28,43 +28,70 @@ INPUT_FILE = PROJECT_ROOT / "Output" / "Caching" / f"{CROSS_ENCODER_PREFIX}_Cach
 OUTPUT_DIR = PROJECT_ROOT / "Output" / "Generation"/ "Modified"/ "Bug Reports"
 OUTPUT_FILE_NAME = f"{CROSS_ENCODER_PREFIX}_Rake_Cached_BR_Keywords.json"
 
-KEYWORD_MODEL_NAME = "Salesforce/codet5-small"
-
 
 DEFAULT_N_GRAM_LEFT = 1
 DEFAULT_N_GRAM_RIGHT = 1
 DEFAULT_STOP_WORDS = "english"
-DEFAULT_DIVERSITY = 0.5
 DEFAULT_TOP_N = 15
 
 # ============================================================
 # Alternativa experimental: extrator
 # ============================================================
 
-def generate_keywords_for_reports(bug_reports: list[dict], kw_model: Rake) -> list[dict]:
+
+def generate_keywords_for_reports(
+    bug_reports: list[dict],
+    kw_model: Rake
+) -> list[dict]:
+
     generated_reports = []
 
     for bug_report in tqdm(
-    bug_reports,
-    total=len(bug_reports),
-    desc="Generating BR keywords with RAKE",
+        bug_reports,
+        total=len(bug_reports),
+        desc="Generating BR keywords with RAKE",
     ):
         bug_text = _build_bug_report_text(bug_report)
 
+        # RAKE calcula frequências e coocorrências
+        # a partir das frases candidatas.
         kw_model.extract_keywords_from_text(bug_text)
-        keywords = kw_model.get_ranked_phrases()[:DEFAULT_TOP_N]
+
+        frequencies = (
+            kw_model.get_word_frequency_distribution()
+        )
+        degrees = kw_model.get_word_degrees()
+
+        # Rankear palavras individuais com a
+        # fórmula padrão do RAKE: degree / frequency.
+        ranked_words = sorted(
+            frequencies.keys(),
+            key=lambda word: (
+                -degrees[word] / frequencies[word],
+                -frequencies[word],
+                word,
+            )
+        )
+
+        # Selecionar até 15 unigramas distintos.
+        keywords = ranked_words[:DEFAULT_TOP_N]
         keywords_joined = " ".join(keywords)
 
         output_bug_report = dict(bug_report)
         output_bug_report["keywords"] = keywords_joined
-        output_bug_report["n_gram_left"] = DEFAULT_N_GRAM_LEFT
-        output_bug_report["n_gram_right"] = DEFAULT_N_GRAM_RIGHT
+        output_bug_report["n_gram_left"] = 1
+        output_bug_report["n_gram_right"] = 1
         output_bug_report["stop_words"] = DEFAULT_STOP_WORDS
-        output_bug_report["nr_candidates"] = DEFAULT_DIVERSITY
+
+        # Metadados específicos da variante.
+        output_bug_report["keyword_extractor"] = "RAKE"
+        output_bug_report["rake_word_ranking"] = "degree/frequency"
+        output_bug_report["rake_top_n"] = DEFAULT_TOP_N
 
         generated_reports.append(output_bug_report)
 
     return generated_reports
+
 
 
 def main():
@@ -74,7 +101,6 @@ def main():
 
     keyword_model = Rake(
         language="english",
-        max_length=1,
     )
     # 1. Carregar os relatórios em cache.
     cached_bug_reports = JSON_File_IO.load_JSON_to_Dict(str(input_file_path))
